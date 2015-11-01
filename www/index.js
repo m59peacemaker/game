@@ -26,7 +26,350 @@ b||(b=this.rayStepRate),void 0===c&&(c=!1),void 0===d&&(d=!1);var e=this.getTile
 null===this.snapshot?void console.warn("Video.grab cannot run because Phaser.BitmapData is unavailable"):(a&&this.snapshot.cls(),this.snapshot.copy(this.video,0,0,this.width,this.height,0,0,this.width,this.height,0,0,0,1,1,b,c),this.snapshot)},removeVideoElement:function(){if(this.video){for(this.video.parentNode&&this.video.parentNode.removeChild(this.video);this.video.hasChildNodes();)this.video.removeChild(this.video.firstChild);this.video.removeAttribute("autoplay"),this.video.removeAttribute("src"),this.video=null}},destroy:function(){this.stop(),this.removeVideoElement(),this.touchLocked&&this.game.input.touch.removeTouchLockCallback(this.unlock,this),this._retryID&&window.clearTimeout(this._retryID)}},Object.defineProperty(c.Video.prototype,"currentTime",{get:function(){return this.video?this.video.currentTime:0},set:function(a){this.video.currentTime=a}}),Object.defineProperty(c.Video.prototype,"duration",{get:function(){return this.video?this.video.duration:0}}),Object.defineProperty(c.Video.prototype,"progress",{get:function(){return this.video?this.video.currentTime/this.video.duration:0}}),Object.defineProperty(c.Video.prototype,"mute",{get:function(){return this._muted},set:function(a){if(a=a||null){if(this._muted)return;this._codeMuted=!0,this.setMute()}else{if(!this._muted)return;this._codeMuted=!1,this.unsetMute()}}}),Object.defineProperty(c.Video.prototype,"paused",{get:function(){return this._paused},set:function(a){if(a=a||null,!this.touchLocked)if(a){if(this._paused)return;this._codePaused=!0,this.setPause()}else{if(!this._paused)return;this._codePaused=!1,this.setResume()}}}),Object.defineProperty(c.Video.prototype,"volume",{get:function(){return this.video?this.video.volume:1},set:function(a){0>a?a=0:a>1&&(a=1),this.video&&(this.video.volume=a)}}),Object.defineProperty(c.Video.prototype,"playbackRate",{get:function(){return this.video?this.video.playbackRate:1},set:function(a){this.video&&(this.video.playbackRate=a)}}),Object.defineProperty(c.Video.prototype,"loop",{get:function(){return this.video?this.video.loop:!1},set:function(a){a&&this.video?this.video.loop="loop":this.video&&(this.video.loop="")}}),Object.defineProperty(c.Video.prototype,"playing",{get:function(){return!(this.video.paused&&this.video.ended)}}),c.Video.prototype.constructor=c.Video,void 0===PIXI.blendModes&&(PIXI.blendModes=c.blendModes),void 0===PIXI.scaleModes&&(PIXI.scaleModes=c.scaleModes),void 0===PIXI.Texture.emptyTexture&&(PIXI.Texture.emptyTexture=new PIXI.Texture(new PIXI.BaseTexture)),void 0===PIXI.DisplayObject._tempMatrix&&(PIXI.DisplayObject._tempMatrix=new PIXI.Matrix),void 0===PIXI.RenderTexture.tempMatrix&&(PIXI.RenderTexture.tempMatrix=new PIXI.Matrix),PIXI.Graphics&&void 0===PIXI.Graphics.POLY&&(PIXI.Graphics.POLY=c.POLYGON,PIXI.Graphics.RECT=c.RECTANGLE,PIXI.Graphics.CIRC=c.CIRCLE,PIXI.Graphics.ELIP=c.ELLIPSE,PIXI.Graphics.RREC=c.ROUNDEDRECTANGLE),PIXI.TextureSilentFail=!0,"undefined"!=typeof exports?("undefined"!=typeof module&&module.exports&&(exports=module.exports=c),exports.Phaser=c):"undefined"!=typeof define&&define.amd?define("Phaser",function(){return b.Phaser=c}()):b.Phaser=c,c}.call(this);
 //# sourceMappingURL=phaser.map
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/*
+
+  Javascript State Machine Library - https://github.com/jakesgordon/javascript-state-machine
+
+  Copyright (c) 2012, 2013, 2014, 2015, Jake Gordon and contributors
+  Released under the MIT license - https://github.com/jakesgordon/javascript-state-machine/blob/master/LICENSE
+
+*/
+
+(function () {
+
+  var StateMachine = {
+
+    //---------------------------------------------------------------------------
+
+    VERSION: "2.3.5",
+
+    //---------------------------------------------------------------------------
+
+    Result: {
+      SUCCEEDED:    1, // the event transitioned successfully from one state to another
+      NOTRANSITION: 2, // the event was successfull but no state transition was necessary
+      CANCELLED:    3, // the event was cancelled by the caller in a beforeEvent callback
+      PENDING:      4  // the event is asynchronous and the caller is in control of when the transition occurs
+    },
+
+    Error: {
+      INVALID_TRANSITION: 100, // caller tried to fire an event that was innapropriate in the current state
+      PENDING_TRANSITION: 200, // caller tried to fire an event while an async transition was still pending
+      INVALID_CALLBACK:   300 // caller provided callback function threw an exception
+    },
+
+    WILDCARD: '*',
+    ASYNC: 'async',
+
+    //---------------------------------------------------------------------------
+
+    create: function(cfg, target) {
+
+      var initial      = (typeof cfg.initial == 'string') ? { state: cfg.initial } : cfg.initial; // allow for a simple string, or an object with { state: 'foo', event: 'setup', defer: true|false }
+      var terminal     = cfg.terminal || cfg['final'];
+      var fsm          = target || cfg.target  || {};
+      var events       = cfg.events || [];
+      var callbacks    = cfg.callbacks || {};
+      var map          = {}; // track state transitions allowed for an event { event: { from: [ to ] } }
+      var transitions  = {}; // track events allowed from a state            { state: [ event ] }
+
+      var add = function(e) {
+        var from = (e.from instanceof Array) ? e.from : (e.from ? [e.from] : [StateMachine.WILDCARD]); // allow 'wildcard' transition if 'from' is not specified
+        map[e.name] = map[e.name] || {};
+        for (var n = 0 ; n < from.length ; n++) {
+          transitions[from[n]] = transitions[from[n]] || [];
+          transitions[from[n]].push(e.name);
+
+          map[e.name][from[n]] = e.to || from[n]; // allow no-op transition if 'to' is not specified
+        }
+      };
+
+      if (initial) {
+        initial.event = initial.event || 'startup';
+        add({ name: initial.event, from: 'none', to: initial.state });
+      }
+
+      for(var n = 0 ; n < events.length ; n++)
+        add(events[n]);
+
+      for(var name in map) {
+        if (map.hasOwnProperty(name))
+          fsm[name] = StateMachine.buildEvent(name, map[name]);
+      }
+
+      for(var name in callbacks) {
+        if (callbacks.hasOwnProperty(name))
+          fsm[name] = callbacks[name]
+      }
+
+      fsm.current     = 'none';
+      fsm.is          = function(state) { return (state instanceof Array) ? (state.indexOf(this.current) >= 0) : (this.current === state); };
+      fsm.can         = function(event) { return !this.transition && (map[event].hasOwnProperty(this.current) || map[event].hasOwnProperty(StateMachine.WILDCARD)); }
+      fsm.cannot      = function(event) { return !this.can(event); };
+      fsm.transitions = function()      { return transitions[this.current]; };
+      fsm.isFinished  = function()      { return this.is(terminal); };
+      fsm.error       = cfg.error || function(name, from, to, args, error, msg, e) { throw e || msg; }; // default behavior when something unexpected happens is to throw an exception, but caller can override this behavior if desired (see github issue #3 and #17)
+
+      if (initial && !initial.defer)
+        fsm[initial.event]();
+
+      return fsm;
+
+    },
+
+    //===========================================================================
+
+    doCallback: function(fsm, func, name, from, to, args) {
+      if (func) {
+        try {
+          return func.apply(fsm, [name, from, to].concat(args));
+        }
+        catch(e) {
+          return fsm.error(name, from, to, args, StateMachine.Error.INVALID_CALLBACK, "an exception occurred in a caller-provided callback function", e);
+        }
+      }
+    },
+
+    beforeAnyEvent:  function(fsm, name, from, to, args) { return StateMachine.doCallback(fsm, fsm['onbeforeevent'],                       name, from, to, args); },
+    afterAnyEvent:   function(fsm, name, from, to, args) { return StateMachine.doCallback(fsm, fsm['onafterevent'] || fsm['onevent'],      name, from, to, args); },
+    leaveAnyState:   function(fsm, name, from, to, args) { return StateMachine.doCallback(fsm, fsm['onleavestate'],                        name, from, to, args); },
+    enterAnyState:   function(fsm, name, from, to, args) { return StateMachine.doCallback(fsm, fsm['onenterstate'] || fsm['onstate'],      name, from, to, args); },
+    changeState:     function(fsm, name, from, to, args) { return StateMachine.doCallback(fsm, fsm['onchangestate'],                       name, from, to, args); },
+
+    beforeThisEvent: function(fsm, name, from, to, args) { return StateMachine.doCallback(fsm, fsm['onbefore' + name],                     name, from, to, args); },
+    afterThisEvent:  function(fsm, name, from, to, args) { return StateMachine.doCallback(fsm, fsm['onafter'  + name] || fsm['on' + name], name, from, to, args); },
+    leaveThisState:  function(fsm, name, from, to, args) { return StateMachine.doCallback(fsm, fsm['onleave'  + from],                     name, from, to, args); },
+    enterThisState:  function(fsm, name, from, to, args) { return StateMachine.doCallback(fsm, fsm['onenter'  + to]   || fsm['on' + to],   name, from, to, args); },
+
+    beforeEvent: function(fsm, name, from, to, args) {
+      if ((false === StateMachine.beforeThisEvent(fsm, name, from, to, args)) ||
+          (false === StateMachine.beforeAnyEvent( fsm, name, from, to, args)))
+        return false;
+    },
+
+    afterEvent: function(fsm, name, from, to, args) {
+      StateMachine.afterThisEvent(fsm, name, from, to, args);
+      StateMachine.afterAnyEvent( fsm, name, from, to, args);
+    },
+
+    leaveState: function(fsm, name, from, to, args) {
+      var specific = StateMachine.leaveThisState(fsm, name, from, to, args),
+          general  = StateMachine.leaveAnyState( fsm, name, from, to, args);
+      if ((false === specific) || (false === general))
+        return false;
+      else if ((StateMachine.ASYNC === specific) || (StateMachine.ASYNC === general))
+        return StateMachine.ASYNC;
+    },
+
+    enterState: function(fsm, name, from, to, args) {
+      StateMachine.enterThisState(fsm, name, from, to, args);
+      StateMachine.enterAnyState( fsm, name, from, to, args);
+    },
+
+    //===========================================================================
+
+    buildEvent: function(name, map) {
+      return function() {
+
+        var from  = this.current;
+        var to    = map[from] || map[StateMachine.WILDCARD] || from;
+        var args  = Array.prototype.slice.call(arguments); // turn arguments into pure array
+
+        if (this.transition)
+          return this.error(name, from, to, args, StateMachine.Error.PENDING_TRANSITION, "event " + name + " inappropriate because previous transition did not complete");
+
+        if (this.cannot(name))
+          return this.error(name, from, to, args, StateMachine.Error.INVALID_TRANSITION, "event " + name + " inappropriate in current state " + this.current);
+
+        if (false === StateMachine.beforeEvent(this, name, from, to, args))
+          return StateMachine.Result.CANCELLED;
+
+        if (from === to) {
+          StateMachine.afterEvent(this, name, from, to, args);
+          return StateMachine.Result.NOTRANSITION;
+        }
+
+        // prepare a transition method for use EITHER lower down, or by caller if they want an async transition (indicated by an ASYNC return value from leaveState)
+        var fsm = this;
+        this.transition = function() {
+          fsm.transition = null; // this method should only ever be called once
+          fsm.current = to;
+          StateMachine.enterState( fsm, name, from, to, args);
+          StateMachine.changeState(fsm, name, from, to, args);
+          StateMachine.afterEvent( fsm, name, from, to, args);
+          return StateMachine.Result.SUCCEEDED;
+        };
+        this.transition.cancel = function() { // provide a way for caller to cancel async transition if desired (issue #22)
+          fsm.transition = null;
+          StateMachine.afterEvent(fsm, name, from, to, args);
+        }
+
+        var leave = StateMachine.leaveState(this, name, from, to, args);
+        if (false === leave) {
+          this.transition = null;
+          return StateMachine.Result.CANCELLED;
+        }
+        else if (StateMachine.ASYNC === leave) {
+          return StateMachine.Result.PENDING;
+        }
+        else {
+          if (this.transition) // need to check in case user manually called transition() but forgot to return StateMachine.ASYNC
+            return this.transition();
+        }
+
+      };
+    }
+
+  }; // StateMachine
+
+  //===========================================================================
+
+  //======
+  // NODE
+  //======
+  if (typeof exports !== 'undefined') {
+    if (typeof module !== 'undefined' && module.exports) {
+      exports = module.exports = StateMachine;
+    }
+    exports.StateMachine = StateMachine;
+  }
+  //============
+  // AMD/REQUIRE
+  //============
+  else if (typeof define === 'function' && define.amd) {
+    define(function(require) { return StateMachine; });
+  }
+  //========
+  // BROWSER
+  //========
+  else if (typeof window !== 'undefined') {
+    window.StateMachine = StateMachine;
+  }
+  //===========
+  // WEB WORKER
+  //===========
+  else if (typeof self !== 'undefined') {
+    self.StateMachine = StateMachine;
+  }
+
+}());
+
+},{}],2:[function(require,module,exports){
 'use strict';
+
+var StateMachine = require('javascript-state-machine');
+
+module.exports = function (game) {
+
+  var hero = {
+    preload: preload,
+    create: create,
+    update: null,
+    sprite: null,
+    sm: null,
+    cursors: null
+  };
+
+  function preload() {
+    game.load.spritesheet('hero', 'assets/hero.png', 270, 270, 65);
+  }
+
+  function create() {
+
+    var sprite = hero.sprite = game.add.sprite(0, game.height, 'hero', 64);
+    game.physics.enable([sprite], Phaser.Physics.ARCADE);
+    var body = sprite.body;
+    sprite.body.collideWorldBounds = true;
+    sprite.anchor.setTo(.5, 1);
+    var sizes = {
+      setDefault: function setDefault() {
+        return body.setSize(80, 245);
+      },
+      setCrouch: function setCrouch() {
+        return body.setSize(130, 155);
+      }
+    };
+    sizes.setDefault();
+    [['stance', [0, 1, 2, 3]], ['run', [4, 5, 6, 7, 8, 9, 10, 11], 10, true], ['swing', [12, 13, 14, 15]], ['block', [16, 17]], ['hit and die', [18, 19, 20, 21, 22, 23]], ['spell', [24, 25, 26, 27]], ['shoot-bow', [28, 29, 30, 31]], ['walk', [32, 33, 34, 35, 36, 37, 38, 39]], ['crouch', [40, 41], 20, false], ['jump', [42, 43, 44, 45, 46, 47], 10, false], ['ascend-stairs', [48, 49, 50, 51, 52, 53, 54, 55]], ['descend-stairs', [56, 57, 58, 59, 60, 61, 62, 63]]].forEach(function (item) {
+      return sprite.animations.add.apply(sprite.animations, item);
+    });
+
+    var sm = hero.sm = StateMachine.create({
+      initial: 'standing',
+      events: [
+      //{name: 'hitground', from: ['falling'], to: ''},
+      //{name: 'hitroof',   from: ['jumping'], to: ''},
+      //{name: 'fall',      from: ['standing', 'running', 'jumping'], to: ''},
+      { name: 'move', from: ['standing', 'running'], to: 'running' }, { name: 'jump', from: ['standing', 'running'], to: 'jumping' }, { name: 'stop', from: ['standing', 'running'], to: 'standing' }],
+      callbacks: {
+        onmove: function onmove(event, from, to, direction) {
+          if (direction === 'right') {
+            runRight();
+          } else if (direction === 'left') {
+            runLeft();
+          }
+        },
+        onstop: stand
+      }
+    });
+
+    function runRight() {
+      sprite.scale.x = 1;
+      sprite.animations.play('run');
+      body.velocity.x = Math.max(body.velocity.x, 0);
+      body.velocity.x = Math.min(body.velocity.x + 30, 1000);
+    }
+
+    function runLeft() {
+      sprite.scale.x = -1;
+      sprite.animations.play('run');
+      body.velocity.x = Math.min(body.velocity.x, 0);
+      body.velocity.x = Math.max(body.velocity.x - 30, -1000);
+    }
+
+    function stand() {
+      body.velocity.x = decrease(body.velocity.x, 50);
+      sprite.animations.stop();
+      sprite.frame = 64;
+    }
+
+    function crouch() {
+      sprite.animations.play('crouch');
+      body.velocity.x = decrease(body.velocity.x, 30);
+    }
+
+    function jump() {
+      sprite.animations.play('jump');
+      body.velocity.y = -2500;
+    }
+
+    function onGround() {
+      return body.touching.down || body.onFloor();
+    }
+
+    function decrease(val, amt) {
+      return val < 0 ? Math.min(val + amt, 0) : Math.max(val - amt, 0);
+    }
+
+    var cursors = hero.cursors = game.input.keyboard.createCursorKeys();
+    var jumpButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+
+    hero.update = function () {
+      if (cursors.right.isDown || cursors.left.isDown) {
+        sm.move(cursors.right.isDown ? 'right' : 'left');
+      } else {
+        sm.stop();
+      }
+    };
+  }
+
+  return hero;
+};
+
+},{"javascript-state-machine":1}],3:[function(require,module,exports){
+'use strict';
+
+var Hero = require('./Hero');
 
 var width = 1920;
 var height = 1080;
@@ -38,12 +381,13 @@ var game = new Phaser.Game(width, height, Phaser.CANVAS, 'phaser-example', {
   render: render
 });
 
+var hero = new Hero(game);
+
 function preload() {
-  game.load.spritesheet('hero', 'assets/hero.png', 270, 270, 65);
+  hero.preload();
   game.load.image('background', 'assets/starry-night-sky.jpg');
 }
 
-var hero;
 var cursors;
 var jumpButton;
 var bg;
@@ -57,103 +401,18 @@ function create() {
   bg = game.add.tileSprite(0, 0, width, height, 'background');
   bg.fixedToCamera = true;
 
-  hero = game.add.sprite(0, height, 'hero', 64);
-  game.physics.enable([hero], Phaser.Physics.ARCADE);
-  hero.body.collideWorldBounds = true;
-
-  [['stance', [0, 1, 2, 3]], ['run', [4, 5, 6, 7, 8, 9, 10, 11], 10, true], ['swing', [12, 13, 14, 15]], ['block', [16, 17]], ['hit and die', [18, 19, 20, 21, 22, 23]], ['spell', [24, 25, 26, 27]], ['shoot-bow', [28, 29, 30, 31]], ['walk', [32, 33, 34, 35, 36, 37, 38, 39]], ['crouch', [40, 41], 20, false], ['jump', [42, 43, 44, 45, 46, 47], 1, false], ['ascend-stairs', [48, 49, 50, 51, 52, 53, 54, 55]], ['descend-stairs', [56, 57, 58, 59, 60, 61, 62, 63]]].forEach(function (item) {
-    return hero.animations.add.apply(hero.animations, item);
-  });
-
-  hero.body.setSize(80, 245);
-  hero.anchor.setTo(.5, 1);
-
-  game.camera.follow(hero);
-
-  cursors = game.input.keyboard.createCursorKeys();
-  jumpButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+  hero.create();
+  game.camera.follow(hero.sprite);
 }
-
-var jumping = false;
-var crouching = false;
 
 function update() {
-  checkCrouch();
-  if (!crouching) {
-    hero.body.velocity.x = 0;
-  }
-
-  checkJump();
-
-  if (cursors.right.isDown) {
-    if (!jumping && !crouching) {
-      hero.animations.play('run');
-    }
-    hero.scale.x = 1;
-    if (crouching) {
-      hero.body.velocity.x = Math.max(hero.body.velocity.x - 30, 0);
-    } else {
-      hero.body.velocity.x = 1000;
-    }
-  } else if (cursors.left.isDown) {
-    if (!jumping && !crouching) {
-      hero.animations.play('run');
-    }
-    hero.scale.x = -1;
-    if (crouching) {
-      hero.body.velocity.x = Math.min(hero.body.velocity.x + 30, 0);
-    } else {
-      hero.body.velocity.x = -1000;
-    }
-  } else if (!jumping && !crouching) {
-    hero.animations.stop();
-    hero.frame = 64;
-  }
-}
-
-function checkCrouch() {
-  if (cursors.down.isDown && !crouching) {
-    crouching = true;
-    hero.animations.play('crouch');
-  } else if (!cursors.down.isDown && crouching) {
-    crouching = false;
-  }
-}
-
-var hasEndedJump = true;
-var holdingKey = false;
-
-function onGround() {
-  return hero.body.touching.down || hero.body.onFloor();
-}
-
-function checkJump() {
-  if (hasEndedJump && jumpButton.isDown && onGround()) {
-    hasEndedJump = false;
-    hero.body.velocity.y = -2500;
-    holdingKey = true;
-    hero.animations.play('jump');
-    jumping = true;
-    return;
-  }
-  if (holdingKey && jumpButton.isUp) {
-    holdingKey = false;
-  }
-  if (jumping && onGround()) {
-    jumping = false;
-  }
-  if (!hasEndedJump && !jumping && !holdingKey) {
-    hasEndedJump = true;
-  }
-  if (jumping) {
-    hero.body.velocity.y += 50;
-  }
+  hero.update();
 }
 
 function render() {
   game.debug.text(game.time.physicsElapsed, 32, 32);
-  game.debug.body(hero);
-  game.debug.bodyInfo(hero, 16, 24);
+  game.debug.body(hero.sprite);
+  game.debug.bodyInfo(hero.sprite, 16, 24);
 }
 
-},{}]},{},[1]);
+},{"./Hero":2}]},{},[3]);
