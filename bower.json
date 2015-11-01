@@ -1,0 +1,11 @@
+{
+  "name": "game",
+  "authors": [
+    "Johnny Hauser <johnnyhauser@gmail.com>"
+  ],
+  "license": "VOL",
+  "private": true,
+  "dependencies": {
+    "phaser": "~2.4.4"
+  }
+}
