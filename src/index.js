@@ -1,4 +1,4 @@
-let Hero = require('./Hero');
+let Hero = require('./hero');
 
 var width = 1920;
 var height = 1080;
@@ -10,16 +10,13 @@ var game = new Phaser.Game(width, height, Phaser.CANVAS, 'phaser-example', {
   render: render
 });
 
-var hero = new Hero(game);
-
 function preload() {
-  hero.preload();
+  Hero.preload(game);
   game.load.image('background', 'assets/starry-night-sky.jpg');
 }
 
-var cursors;
-var jumpButton;
 var bg;
+var hero;
 
 function create() {
   game.physics.startSystem(Phaser.Physics.ARCADE);
@@ -30,7 +27,7 @@ function create() {
   bg = game.add.tileSprite(0, 0, width, height, 'background');
   bg.fixedToCamera = true;
 
-  hero.create();
+  hero = new Hero(game);
   game.camera.follow(hero.sprite);
 }
 

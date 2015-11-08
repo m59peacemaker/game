@@ -43,6 +43,7 @@ module.exports = game => {
       ['descend-stairs', [56,57,58,59,60,61,62,63], true]
     ].forEach(item => sprite.animations.add.apply(sprite.animations, item));
 
+    var update = () => {};
     let sm = hero.sm = StateMachine.create({
       initial: 'standing',
       events: [
@@ -56,25 +57,30 @@ module.exports = game => {
       callbacks: {
         onmove: (event, from, to, direction) => {
           if (direction === 'right') {
-            runRight();
+            update = runRight;
           } else if (direction === 'left') {
-            runLeft();
+            update = runLeft;
           }
         },
-        onstop: stand,
+        onrunning: (a,b,c,d) => {
+          sprite.animations.play('run');
+        },
+        onjump: () => update = jump,
+        onjumping: () => {
+          sprite.animations.play('jump');
+        },
+        onstop: () => update = stand,
       }
     });
 
     function runRight() {
       sprite.scale.x = 1;
-      sprite.animations.play('run');
       body.velocity.x = Math.max(body.velocity.x, 0);
       body.velocity.x = Math.min(body.velocity.x+30, 1000);
     }
 
     function runLeft() {
       sprite.scale.x = -1;
-      sprite.animations.play('run');
       body.velocity.x = Math.min(body.velocity.x, 0);
       body.velocity.x = Math.max(body.velocity.x-30, -1000);
     }
@@ -91,7 +97,6 @@ module.exports = game => {
     }
 
     function jump() {
-      sprite.animations.play('jump');
       body.velocity.y = -2500;
     }
 
@@ -107,11 +112,14 @@ module.exports = game => {
     let jumpButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
 
     hero.update = () => {
-      if (cursors.right.isDown || cursors.left.isDown) {
+      if (jumpButton.isDown) {
+        sm.jump();
+      } else if (cursors.right.isDown || cursors.left.isDown) {
         sm.move(cursors.right.isDown ? 'right' : 'left');
       } else {
         sm.stop();
       }
+      update();
     };
 
   }
