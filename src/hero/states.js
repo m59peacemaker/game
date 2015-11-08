@@ -34,7 +34,8 @@ module.exports = function(agent) {
       },
       exit: size.setDefault,
       events: {
-        mid: 'standing'
+        mid: 'standing',
+        jump: 'jumping'
       }
     },
     running: {
