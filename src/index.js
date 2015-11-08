@@ -36,7 +36,7 @@ function update() {
 }
 
 function render () {
-  game.debug.text(game.time.physicsElapsed, 32, 32);
-  game.debug.body(hero.sprite);
-  game.debug.bodyInfo(hero.sprite, 16, 24);
+//  game.debug.text(game.time.physicsElapsed, 32, 32);
+//  game.debug.body(hero.sprite);
+//  game.debug.bodyInfo(hero.sprite, 16, 24);
 }
