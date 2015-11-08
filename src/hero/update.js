@@ -20,6 +20,10 @@ module.exports = function(agent) {
     let wasDown = state.down;
     state.down = ym < 0;
 
+    if (!state.releasedJump && ym < 1) {
+      state.releasedJump = true;
+    }
+
     if (isGrounded && !wasGrounded) {
       sm.trigger('hitground');
     }
@@ -29,10 +33,10 @@ module.exports = function(agent) {
     if (xm) {
       sm.trigger('move');
     }
-    if (ym > 0 && state.jumpKeyAllowed) {
+    if (ym > 0 && state.releasedJump) {
+      state.releasedJump = false;
       sm.trigger('jump');
     }
-    state.jumpKeyAllowed = isGrounded && ym < 1;
 
     if (ym < 0) {
       sm.trigger('down');
@@ -50,7 +54,9 @@ module.exports = function(agent) {
       //agent.shape.friction = 0;
     }
 
-    sm.updateState();
+    sm.updateState({
+      xm, ym, xv, yv
+    });
   }
 
   return update;

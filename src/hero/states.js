@@ -7,8 +7,8 @@ module.exports = function(agent) {
   }
 
   let size = {
-    setDefault: () => body.setSize(80, 245),
-    setCrouch: () => body.setSize(130, 155)
+    setDefault: () => body.setSize(80, 250),
+    setCrouch: () => body.setSize(130, 160)
   };
   size.setDefault();
 
@@ -26,9 +26,9 @@ module.exports = function(agent) {
       }
     },
     crouching: {
-      enter: (params) => {
+      enter: ({wasSliding}) => {
         size.setCrouch();
-        if (!params.wasSliding) {
+        if (!wasSliding) {
           animations.play('crouch');
         }
       },
@@ -42,9 +42,7 @@ module.exports = function(agent) {
       enter: () => {
         animations.play('run');
       },
-      update: () => {
-        let {xv} = getVelocity();
-        let {xm} = getMovement();
+      update: ({xv, xm}) => {
         // flip character
         sprite.scale.x = xm;
         //body.velocity.x = 1000 * xm;
@@ -97,8 +95,8 @@ module.exports = function(agent) {
         mid: 'sliding',
         jump: 'jumping'
       },
-      update: () => {
-        body.velocity.x = decrease(body.velocity.x, 40);
+      update: ({xv}) => {
+        body.velocity.x = decrease(xv, 40);
         if (!body.velocity.x) {
           sm.setState('crouching', {wasSliding: true});
         }
@@ -112,7 +110,7 @@ module.exports = function(agent) {
       },
       events: {
         hitground: () => {
-          let {xm, ym} = getMovement()
+          let {xm} = getMovement()
           xm ? sm.setState('running') : sm.setState('standing');
         }
       }
@@ -120,14 +118,10 @@ module.exports = function(agent) {
     jumping: {
       enter: () => {
         animations.play('jump');
-        let {xv, yv} = getVelocity();
         body.velocity.y = -1600;
       },
-      update: () => {
-        let {xv, yv} = getVelocity();
-        let {xm, ym} = getMovement();
-        // make jump a minimum amount, more if held
-        if (!ym && (yv > -1000 && yv < 0)) {
+      update: ({yv, ym}) => {
+        if (ym < 1 && yv < 0) {
           body.velocity.y = 0;
         }
       },
