@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "build": {
+    "dest": "./www",
+    "browserify": {
+      "entries": [
+        "./src/index.js"
+      ]
+    },
+    "copy": [
+      "./src/index.html",
+      "./src/app.css",
+      "./src/assets/**"
+    ],
+    "jsDeps": [
+      "./node_modules/phaser/dist/phaser.min.js"
+    ]
+  },
+  "browserify": {
+    "transform": [
+      "babelify"
+    ]
+  },
+  "devDependencies": {
+    "babelify": "^6.3.0",
+    "browserify": "^11.1.0",
+    "del": "^2.0.2",
+    "event-stream": "^3.3.2",
+    "gulp": "^3.9.0",
+    "gulp-concat": "^2.6.0",
+    "live-server": "^0.8.1",
+    "vinyl-buffer": "^1.0.0",
+    "vinyl-source-stream": "^1.1.0",
+    "watchify": "^3.4.0"
+  },
+  "dependencies": {
+    "javascript-state-machine": "^2.3.5",
+    "lodash": "^3.10.1",
+    "phaser": "^2.4.4"
+  }
+}
