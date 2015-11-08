@@ -3,6 +3,7 @@ let States = require('./states');
 module.exports = function(agent) {
 
   let {body, sm} = agent;
+  let state = agent.state = {};
 
   function onGround() {
     return body.touching.down || body.onFloor();
@@ -14,9 +15,10 @@ module.exports = function(agent) {
 
     let isGrounded = onGround();
     let wasGrounded = agent.grounded;
-    agent.grounded = isGrounded;
-    let wasDown = agent.down;
-    agent.down = ym < 0;
+    state.grounded = isGrounded;
+
+    let wasDown = state.down;
+    state.down = ym < 0;
 
     if (isGrounded && !wasGrounded) {
       sm.trigger('hitground');
@@ -27,9 +29,10 @@ module.exports = function(agent) {
     if (xm) {
       sm.trigger('move');
     }
-    if (ym > 0) {
+    if (ym > 0 && state.jumpKeyAllowed) {
       sm.trigger('jump');
     }
+    state.jumpKeyAllowed = isGrounded && ym < 1;
 
     if (ym < 0) {
       sm.trigger('down');

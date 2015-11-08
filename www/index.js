@@ -322,6 +322,8 @@ module.exports = function (agent) {
   var body = agent.body;
   var sm = agent.sm;
 
+  var state = agent.state = {};
+
   function onGround() {
     return body.touching.down || body.onFloor();
   }
@@ -339,9 +341,10 @@ module.exports = function (agent) {
 
     var isGrounded = onGround();
     var wasGrounded = agent.grounded;
-    agent.grounded = isGrounded;
-    var wasDown = agent.down;
-    agent.down = ym < 0;
+    state.grounded = isGrounded;
+
+    var wasDown = state.down;
+    state.down = ym < 0;
 
     if (isGrounded && !wasGrounded) {
       sm.trigger('hitground');
@@ -352,9 +355,10 @@ module.exports = function (agent) {
     if (xm) {
       sm.trigger('move');
     }
-    if (ym > 0) {
+    if (ym > 0 && state.jumpKeyAllowed) {
       sm.trigger('jump');
     }
+    state.jumpKeyAllowed = isGrounded && ym < 1;
 
     if (ym < 0) {
       sm.trigger('down');
