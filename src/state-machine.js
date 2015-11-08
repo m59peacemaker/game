@@ -16,8 +16,8 @@ module.exports = function(initialState) {
     }
   }
 
-  function updateState() {
-    states[currentState].update && states[currentState].update();
+  function updateState(...args) {
+    states[currentState].update && states[currentState].update(...args);
   }
 
   function trigger(event, ...args) {

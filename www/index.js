@@ -124,10 +124,10 @@ module.exports = function (agent) {
 
   var size = {
     setDefault: function setDefault() {
-      return body.setSize(80, 245);
+      return body.setSize(80, 250);
     },
     setCrouch: function setCrouch() {
-      return body.setSize(130, 155);
+      return body.setSize(130, 160);
     }
   };
   size.setDefault();
@@ -146,9 +146,11 @@ module.exports = function (agent) {
       }
     },
     crouching: {
-      enter: function enter(params) {
+      enter: function enter(_ref) {
+        var wasSliding = _ref.wasSliding;
+
         size.setCrouch();
-        if (!params.wasSliding) {
+        if (!wasSliding) {
           animations.play('crouch');
         }
       },
@@ -162,14 +164,9 @@ module.exports = function (agent) {
       enter: function enter() {
         animations.play('run');
       },
-      update: function update() {
-        var _getVelocity = getVelocity();
-
-        var xv = _getVelocity.xv;
-
-        var _getMovement = getMovement();
-
-        var xm = _getMovement.xm;
+      update: function update(_ref2) {
+        var xv = _ref2.xv;
+        var xm = _ref2.xm;
 
         // flip character
         sprite.scale.x = xm;
@@ -223,8 +220,10 @@ module.exports = function (agent) {
         mid: 'sliding',
         jump: 'jumping'
       },
-      update: function update() {
-        body.velocity.x = decrease(body.velocity.x, 40);
+      update: function update(_ref3) {
+        var xv = _ref3.xv;
+
+        body.velocity.x = decrease(xv, 40);
         if (!body.velocity.x) {
           sm.setState('crouching', { wasSliding: true });
         }
@@ -232,24 +231,23 @@ module.exports = function (agent) {
     },
     falling: {
       update: function update() {
-        var _getVelocity2 = getVelocity();
+        var _getVelocity = getVelocity();
 
-        var xv = _getVelocity2.xv;
-        var yv = _getVelocity2.yv;
+        var xv = _getVelocity.xv;
+        var yv = _getVelocity.yv;
 
-        var _getMovement2 = getMovement();
+        var _getMovement = getMovement();
 
-        var xm = _getMovement2.xm;
-        var ym = _getMovement2.ym;
+        var xm = _getMovement.xm;
+        var ym = _getMovement.ym;
 
         //agent.setVelocity(xv + 150*xm*dt, yv)
       },
       events: {
         hitground: function hitground() {
-          var _getMovement3 = getMovement();
+          var _getMovement2 = getMovement();
 
-          var xm = _getMovement3.xm;
-          var ym = _getMovement3.ym;
+          var xm = _getMovement2.xm;
 
           xm ? sm.setState('running') : sm.setState('standing');
         }
@@ -258,40 +256,26 @@ module.exports = function (agent) {
     jumping: {
       enter: function enter() {
         animations.play('jump');
-
-        var _getVelocity3 = getVelocity();
-
-        var xv = _getVelocity3.xv;
-        var yv = _getVelocity3.yv;
-
         body.velocity.y = -1600;
       },
-      update: function update() {
-        var _getVelocity4 = getVelocity();
+      update: function update(_ref4) {
+        var yv = _ref4.yv;
+        var ym = _ref4.ym;
 
-        var xv = _getVelocity4.xv;
-        var yv = _getVelocity4.yv;
-
-        var _getMovement4 = getMovement();
-
-        var xm = _getMovement4.xm;
-        var ym = _getMovement4.ym;
-
-        // make jump a minimum amount, more if held
-        if (!ym && yv > -1000 && yv < 0) {
+        if (ym < 1 && yv < 0) {
           body.velocity.y = 0;
         }
       },
       events: {
         move: function move() {
-          var _getVelocity5 = getVelocity();
+          var _getVelocity2 = getVelocity();
 
-          var xv = _getVelocity5.xv;
-          var yv = _getVelocity5.yv;
+          var xv = _getVelocity2.xv;
+          var yv = _getVelocity2.yv;
 
-          var _getMovement5 = getMovement();
+          var _getMovement3 = getMovement();
 
-          var xm = _getMovement5.xm;
+          var xm = _getMovement3.xm;
 
           sprite.scale.x = xm;
           if (xm > 0) {
@@ -301,10 +285,10 @@ module.exports = function (agent) {
           }
         },
         hitground: function hitground() {
-          var _getMovement6 = getMovement();
+          var _getMovement4 = getMovement();
 
-          var xm = _getMovement6.xm;
-          var ym = _getMovement6.ym;
+          var xm = _getMovement4.xm;
+          var ym = _getMovement4.ym;
 
           xm ? sm.setState('running') : sm.setState('sliding');
         }
@@ -321,6 +305,8 @@ var States = require('./states');
 module.exports = function (agent) {
   var body = agent.body;
   var sm = agent.sm;
+
+  var state = agent.state = {};
 
   function onGround() {
     return body.touching.down || body.onFloor();
@@ -339,9 +325,14 @@ module.exports = function (agent) {
 
     var isGrounded = onGround();
     var wasGrounded = agent.grounded;
-    agent.grounded = isGrounded;
-    var wasDown = agent.down;
-    agent.down = ym < 0;
+    state.grounded = isGrounded;
+
+    var wasDown = state.down;
+    state.down = ym < 0;
+
+    if (!state.releasedJump && ym < 1) {
+      state.releasedJump = true;
+    }
 
     if (isGrounded && !wasGrounded) {
       sm.trigger('hitground');
@@ -352,7 +343,8 @@ module.exports = function (agent) {
     if (xm) {
       sm.trigger('move');
     }
-    if (ym > 0) {
+    if (ym > 0 && state.releasedJump) {
+      state.releasedJump = false;
       sm.trigger('jump');
     }
 
@@ -372,7 +364,9 @@ module.exports = function (agent) {
         //agent.shape.friction = 0;
       }
 
-    sm.updateState();
+    sm.updateState({
+      xm: xm, ym: ym, xv: xv, yv: yv
+    });
   }
 
   return update;
@@ -419,9 +413,9 @@ function update() {
 }
 
 function render() {
-  game.debug.text(game.time.physicsElapsed, 32, 32);
-  game.debug.body(hero.sprite);
-  game.debug.bodyInfo(hero.sprite, 16, 24);
+  //  game.debug.text(game.time.physicsElapsed, 32, 32);
+  //  game.debug.body(hero.sprite);
+  //  game.debug.bodyInfo(hero.sprite, 16, 24);
 }
 
 },{"./hero":2}],7:[function(require,module,exports){
@@ -454,7 +448,9 @@ module.exports = function (initialState) {
   }
 
   function updateState() {
-    states[currentState].update && states[currentState].update();
+    var _states$currentState2;
+
+    states[currentState].update && (_states$currentState2 = states[currentState]).update.apply(_states$currentState2, arguments);
   }
 
   function trigger(event) {
