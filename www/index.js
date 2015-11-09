@@ -28,9 +28,13 @@ null===this.snapshot?void console.warn("Video.grab cannot run because Phaser.Bit
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 'use strict';
 
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i]; return arr2; } else { return Array.from(arr); } }
+
 module.exports = function (sprite) {
   [['stance', [0, 1, 2, 3]], ['run', [4, 5, 6, 7, 8, 9, 10, 11], 10, true], ['swing', [12, 13, 14, 15]], ['block', [16, 17]], ['hit and die', [18, 19, 20, 21, 22, 23]], ['spell', [24, 25, 26, 27]], ['shoot-bow', [28, 29, 30, 31]], ['walk', [32, 33, 34, 35, 36, 37, 38, 39]], ['crouch', [40, 41], 20, false], ['jump', [42, 43, 44], 30, false], ['fall', [45, 46, 47], 10, false], ['ascend-stairs', [48, 49, 50, 51, 52, 53, 54, 55], 10, true], ['descend-stairs', [56, 57, 58, 59, 60, 61, 62, 63], 10, true]].forEach(function (item) {
-    return sprite.animations.add.apply(sprite.animations, item);
+    var _sprite$animations;
+
+    return (_sprite$animations = sprite.animations).add.apply(_sprite$animations, _toConsumableArray(item));
   });
 };
 
@@ -38,27 +42,24 @@ module.exports = function (sprite) {
 'use strict';
 
 var addAnimations = require('./add-animations');
-var preload = require('./preload');
 var Update = require('./update');
 var States = require('./states');
-var StateMachine = require('../state-machine');
+var StateMachine = require('../../state-machine');
 
 module.exports = Hero;
 
-Hero.preload = preload;
-
 function Hero(game) {
 
-  var cursors = game.input.keyboard.createCursorKeys();
-  var jumpButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
-
-  var sprite = game.add.sprite(0, game.height, 'hero', 64);
-  game.physics.enable([sprite], Phaser.Physics.ARCADE);
+  var sprite = game.add.sprite(0, 600, 'hero', 64);
   sprite.anchor.setTo(.5, 1);
   addAnimations(sprite);
+  game.physics.enable(sprite, Phaser.Physics.ARCADE);
 
   var body = sprite.body;
   body.collideWorldBounds = true;
+
+  var cursors = game.input.keyboard.createCursorKeys();
+  var jumpButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
 
   function getMovement() {
     var xm = 0;
@@ -100,7 +101,7 @@ function Hero(game) {
   return hero;
 }
 
-},{"../state-machine":7,"./add-animations":1,"./preload":3,"./states":4,"./update":5}],3:[function(require,module,exports){
+},{"../../state-machine":13,"./add-animations":1,"./states":4,"./update":5}],3:[function(require,module,exports){
 'use strict';
 
 module.exports = function (game) {
@@ -157,7 +158,8 @@ module.exports = function (agent) {
       exit: size.setDefault,
       events: {
         mid: 'standing',
-        jump: 'jumping'
+        jump: 'jumping',
+        fall: 'falling'
       }
     },
     running: {
@@ -198,7 +200,8 @@ module.exports = function (agent) {
         move: 'running',
         down: 'slidingCrouched',
         jump: 'jumping',
-        mid: 'standing'
+        mid: 'standing',
+        fall: 'falling'
       },
       update: function update() {
         if (body.velocity.x) {
@@ -218,7 +221,8 @@ module.exports = function (agent) {
       },
       events: {
         mid: 'sliding',
-        jump: 'jumping'
+        jump: 'jumping',
+        fall: 'falling'
       },
       update: function update(_ref3) {
         var xv = _ref3.xv;
@@ -230,6 +234,9 @@ module.exports = function (agent) {
       }
     },
     falling: {
+      enter: function enter() {
+        animations.play('fall');
+      },
       update: function update() {
         var _getVelocity = getVelocity();
 
@@ -249,7 +256,7 @@ module.exports = function (agent) {
 
           var xm = _getMovement2.xm;
 
-          xm ? sm.setState('running') : sm.setState('standing');
+          xm ? sm.setState('running') : sm.setState('sliding');
         }
       }
     },
@@ -288,7 +295,6 @@ module.exports = function (agent) {
           var _getMovement4 = getMovement();
 
           var xm = _getMovement4.xm;
-          var ym = _getMovement4.ym;
 
           xm ? sm.setState('running') : sm.setState('sliding');
         }
@@ -323,21 +329,24 @@ module.exports = function (agent) {
     var xv = _agent$getVelocity.xv;
     var yv = _agent$getVelocity.yv;
 
-    var isGrounded = onGround();
-    var wasGrounded = agent.grounded;
-    state.grounded = isGrounded;
+    var wasGrounded = state.grounded;
+    state.grounded = onGround();
 
     var wasDown = state.down;
     state.down = ym < 0;
 
-    if (!state.releasedJump && ym < 1) {
+    var jumpPressed = ym > 0;
+
+    if (!state.releasedJump && !jumpPressed) {
       state.releasedJump = true;
     }
 
-    if (isGrounded && !wasGrounded) {
+    if (state.grounded && !wasGrounded) {
+      console.log('hitground');
       sm.trigger('hitground');
     }
-    if (!isGrounded && wasGrounded) {
+    if (!state.grounded && wasGrounded && !jumpPressed) {
+      console.log('fall');
       sm.trigger('fall');
     }
     if (xm) {
@@ -358,7 +367,7 @@ module.exports = function (agent) {
       sm.trigger('stop');
     }
 
-    if (isGrounded) {
+    if (state.grounded) {
       //agent.shape.friction = 1;
     } else {
         //agent.shape.friction = 0;
@@ -375,50 +384,95 @@ module.exports = function (agent) {
 },{"./states":4}],6:[function(require,module,exports){
 'use strict';
 
-var Hero = require('./hero');
+var state = require('./state');
+var Hero = require('./characters/hero');
+var Platform = require('./objects/platform');
 
-var width = 1920;
-var height = 1080;
-
-var game = new Phaser.Game(width, height, Phaser.CANVAS, 'phaser-example', {
-  preload: preload,
-  create: create,
-  update: update,
-  render: render
-});
-
-function preload() {
-  Hero.preload(game);
-  game.load.image('background', 'assets/starry-night-sky.jpg');
-}
-
-var bg;
-var hero;
-
-function create() {
-  game.physics.startSystem(Phaser.Physics.ARCADE);
-  game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+module.exports = function (game) {
   game.stage.backgroundColor = '#000000';
+  game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+  game.physics.startSystem(Phaser.Physics.ARCADE);
   game.physics.arcade.gravity.y = 4000;
 
-  bg = game.add.tileSprite(0, 0, width, height, 'background');
+  var bg = game.add.tileSprite(0, 0, game.width, game.height, 'background');
   bg.fixedToCamera = true;
 
-  hero = new Hero(game);
-  game.camera.follow(hero.sprite);
+  state.platform = new Platform(game);
+  state.p1 = new Hero(game);
+  game.camera.follow(state.p1.sprite);
+};
+
+},{"./characters/hero":2,"./objects/platform":9,"./state":14}],7:[function(require,module,exports){
+'use strict';
+
+var state = require('./state');
+
+module.exports = function (game) {
+  game.physics.arcade.collide(state.p1.sprite, state.platform.sprite);
+  state.p1.update();
+};
+
+},{"./state":14}],8:[function(require,module,exports){
+'use strict';
+
+new Phaser.Game(1920, 1080, Phaser.CANVAS, 'my-game', {
+  preload: require('./preload'),
+  create: require('./create'),
+  update: require('./game-loop'),
+  render: require('./render')
+});
+
+},{"./create":6,"./game-loop":7,"./preload":11,"./render":12}],9:[function(require,module,exports){
+'use strict';
+
+module.exports = Platform;
+
+function Platform(game) {
+  var sprite = game.add.sprite(800, game.height - 300, 'platform');
+  //sprite.anchor.setTo(0, 1);
+  game.physics.enable(sprite, Phaser.Physics.ARCADE);
+  var body = sprite.body;
+  body.immovable = true;
+  body.allowGravity = false;
+  ['left', 'right', 'down'].forEach(function (direction) {
+    body.checkCollision[direction] = false;
+  });
+  body.setSize(sprite.body.width, sprite.body.height - 10, 0, 10);
+  return {
+    sprite: sprite,
+    body: body
+  };
 }
 
-function update() {
-  hero.update();
-}
+},{}],10:[function(require,module,exports){
+'use strict';
 
-function render() {
-  //  game.debug.text(game.time.physicsElapsed, 32, 32);
-  //  game.debug.body(hero.sprite);
-  //  game.debug.bodyInfo(hero.sprite, 16, 24);
-}
+module.exports = function (game) {
+  game.load.image('platform', 'assets/platform.png');
+};
 
-},{"./hero":2}],7:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
+'use strict';
+
+module.exports = function (game) {
+  require('./characters/hero/preload')(game);
+  require('./objects/platform/preload')(game);
+  game.load.image('background', 'assets/starry-night-sky.jpg');
+};
+
+},{"./characters/hero/preload":3,"./objects/platform/preload":10}],12:[function(require,module,exports){
+'use strict';
+
+var state = require('./state');
+
+module.exports = function (game) {
+  var sprite = state.platform.sprite;
+  //game.debug.text(game.time.physicsElapsed, 32, 32);
+  //game.debug.body(sprite);
+  //game.debug.bodyInfo(sprite, 16, 24);
+};
+
+},{"./state":14}],13:[function(require,module,exports){
 'use strict';
 
 module.exports = function (initialState) {
@@ -486,4 +540,9 @@ module.exports = function (initialState) {
   };
 };
 
-},{}]},{},[6]);
+},{}],14:[function(require,module,exports){
+"use strict";
+
+module.exports = {};
+
+},{}]},{},[8]);
