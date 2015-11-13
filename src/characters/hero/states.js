@@ -2,6 +2,9 @@ module.exports = function(agent) {
 
   let {sprite, body, animations, sm, getVelocity, getMovement} = agent;
 
+  function increase(val, amt) {
+    return val < 0 ? val - amt : val + amt;
+  }
   function decrease(val, amt) {
     return val < 0 ? Math.min(val + amt, 0) : Math.max(val - amt, 0);
   }
@@ -43,7 +46,8 @@ module.exports = function(agent) {
       enter: () => {
         animations.play('run');
       },
-      update: ({xv, xm}) => {
+      update: ({xm}) => {
+        let xv = body.velocity.x;
         // flip character
         sprite.scale.x = xm;
         //body.velocity.x = 1000 * xm;
@@ -87,6 +91,8 @@ module.exports = function(agent) {
     },
     slidingCrouched: {
       enter: () => {
+        // running to crouch adds some force to the slide
+        body.velocity.x+= body.velocity.x / 7;
         animations.play('crouch'); //todo: slidingCrouched animation
         size.setCrouch();
       },
@@ -99,7 +105,7 @@ module.exports = function(agent) {
         fall: 'falling'
       },
       update: ({xv}) => {
-        body.velocity.x = decrease(xv, 40);
+        body.velocity.x = decrease(body.velocity.x, 40);
         if (!body.velocity.x) {
           sm.setState('crouching', {wasSliding: true});
         }

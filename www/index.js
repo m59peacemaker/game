@@ -119,6 +119,9 @@ module.exports = function (agent) {
   var getVelocity = agent.getVelocity;
   var getMovement = agent.getMovement;
 
+  function increase(val, amt) {
+    return val < 0 ? val - amt : val + amt;
+  }
   function decrease(val, amt) {
     return val < 0 ? Math.min(val + amt, 0) : Math.max(val - amt, 0);
   }
@@ -167,9 +170,9 @@ module.exports = function (agent) {
         animations.play('run');
       },
       update: function update(_ref2) {
-        var xv = _ref2.xv;
         var xm = _ref2.xm;
 
+        var xv = body.velocity.x;
         // flip character
         sprite.scale.x = xm;
         //body.velocity.x = 1000 * xm;
@@ -213,6 +216,8 @@ module.exports = function (agent) {
     },
     slidingCrouched: {
       enter: function enter() {
+        // running to crouch adds some force to the slide
+        body.velocity.x += body.velocity.x / 7;
         animations.play('crouch'); //todo: slidingCrouched animation
         size.setCrouch();
       },
@@ -227,7 +232,7 @@ module.exports = function (agent) {
       update: function update(_ref3) {
         var xv = _ref3.xv;
 
-        body.velocity.x = decrease(xv, 40);
+        body.velocity.x = decrease(body.velocity.x, 40);
         if (!body.velocity.x) {
           sm.setState('crouching', { wasSliding: true });
         }
@@ -342,11 +347,9 @@ module.exports = function (agent) {
     }
 
     if (state.grounded && !wasGrounded) {
-      console.log('hitground');
       sm.trigger('hitground');
     }
     if (!state.grounded && wasGrounded && !jumpPressed) {
-      console.log('fall');
       sm.trigger('fall');
     }
     if (xm) {
@@ -373,9 +376,7 @@ module.exports = function (agent) {
         //agent.shape.friction = 0;
       }
 
-    sm.updateState({
-      xm: xm, ym: ym, xv: xv, yv: yv
-    });
+    sm.updateState(Object.assign(agent.getMovement(), agent.getVelocity()));
   }
 
   return update;

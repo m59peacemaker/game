@@ -26,11 +26,9 @@ module.exports = function(agent) {
     }
 
     if (state.grounded && !wasGrounded) {
-      console.log('hitground');
       sm.trigger('hitground');
     }
     if (!state.grounded && wasGrounded && !jumpPressed) {
-      console.log('fall');
       sm.trigger('fall');
     }
     if (xm) {
@@ -57,9 +55,7 @@ module.exports = function(agent) {
       //agent.shape.friction = 0;
     }
 
-    sm.updateState({
-      xm, ym, xv, yv
-    });
+    sm.updateState(Object.assign(agent.getMovement(), agent.getVelocity()));
   }
 
   return update;
